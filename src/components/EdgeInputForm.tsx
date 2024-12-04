@@ -1,3 +1,4 @@
+import { useContext } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -20,10 +21,9 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
-import { Edge } from "@/types/edge";
-import { Node } from "@/types/node";
-
+import { GraphContext } from "@/context/graph-context";
 import { generateEdgeId } from "@/utils/generator";
+import { Algorithm } from "@/utils/constants";
 
 const FormSchema = z.object({
   from: z.string({
@@ -32,38 +32,25 @@ const FormSchema = z.object({
   to: z.string({
     required_error: "Please select a node for the 'to' edge.",
   }),
+  edgeWeight: z.string({
+    required_error: "Please provide a weight for the edge.",
+  }),
 });
 
-const DijkstraFormSchema=FormSchema.extend({
-  edgeWeight: z
-    .string()
-    .regex(/^\d+(\.\d{1,2})?$/, {
-      message: "Edge weight must be a valid number.",
-    })
-    .min(0, { message: "Edge weight is required." })
-})
-
-const BellmanFordSchema=FormSchema.extend({
-  edgeWeight: z
-  .string()
-  .regex(/^\d+(\.\d{1,2})?$/, {
-    message: "Edge weight must be a valid number.",
-  })
-})
-
 interface EdgeInputFormProps {
-  edges: Edge[];
-  setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-  nodes: Node[];
-  graphType:string
+  algorithm: Algorithm;
 }
 
-export function EdgeInputForm({ edges, setEdges, nodes,graphType }: EdgeInputFormProps) {
+export function EdgeInputForm({ algorithm }: EdgeInputFormProps) {
+  const graphContext = useContext(GraphContext);
 
-  const currentSchema = graphType === "dijkstra" ? DijkstraFormSchema : BellmanFordSchema;
+  if (!graphContext) {
+    throw new Error("useGraphContext must be used within a GraphProvider");
+  }
 
+  const { nodes, addEdge } = graphContext;
 
-  const form = useForm<z.infer<typeof currentSchema>>({
+  const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
       from: "",
@@ -72,20 +59,34 @@ export function EdgeInputForm({ edges, setEdges, nodes,graphType }: EdgeInputFor
     },
   });
 
-  function onSubmit(data: z.infer<typeof currentSchema>) {
-    console.log(`number is ${parseInt(data.edgeWeight,10)}`)
-    const newEdge: Edge = {
-      id: generateEdgeId.next().value!,
-      from: parseInt(data.from),
-      to: parseInt(data.to),
-      weight: parseFloat(data.edgeWeight),
+  const onSubmit = (data: z.infer<typeof FormSchema>) => {
+    const edgeWeight = parseInt(data.edgeWeight, 10);
+
+    if (algorithm === Algorithm.Dijkstra && edgeWeight < 0) {
+      form.setError("edgeWeight", {
+        type: "manual",
+        message: "Dijkstra's algorithm does not support negative edge weights.",
+      });
+      return;
+    }
+
+    const newEdgeId = generateEdgeId.next().value;
+
+    if (typeof newEdgeId !== "number") {
+      throw new Error("Failed to generate a valid Edge ID");
+    }
+
+    const newEdge = {
+      id: newEdgeId,
+      from: parseInt(data.from, 10),
+      to: parseInt(data.to, 10),
+      weight: edgeWeight,
     };
 
-    setEdges([...edges, newEdge]);
-    form.reset(); // Reset the form state
-    console.log(newEdge.weight)
-  }
- 
+    addEdge(newEdge);
+    form.reset();
+  };
+
   return (
     <Form {...form}>
       <FormLabel>Add edge</FormLabel>
@@ -155,13 +156,14 @@ export function EdgeInputForm({ edges, setEdges, nodes,graphType }: EdgeInputFor
               <FormControl>
                 <Input placeholder="Weight" {...field} />
               </FormControl>
-
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <Button type="submit">Submit</Button>
+        <Button variant="secondary" type="submit">
+          Add
+        </Button>
       </form>
     </Form>
   );
