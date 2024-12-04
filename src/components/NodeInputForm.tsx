@@ -46,7 +46,7 @@ export function NodeInputForm({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(handleSubmit)}
-        className="space-y-8 w-2/3 "
+        className="space-y-8 w-2/3 text-white"
       >
         <FormField
           control={form.control}

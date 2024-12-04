@@ -30,7 +30,7 @@ export function GraphVisualizer({
         const toNode = nodes.find((node) => node.id === edge.to);
 
         if (!fromNode || !toNode) return null;
-
+          
         return (
           <GraphEdge
             key={index}

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { GraphVisualizer } from "@/components/GraphVisualizer";
@@ -9,31 +9,26 @@ import { Node } from "@/types/node";
 import { Edge } from "@/types/edge";
 import { generateNodeId } from "@/utils/generator";
 
-const GraphInput = () => {
+const DijkstraInput = () => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
-  const [newNodePosition, setNewNodePosition] = useState<{
-    x: number;
-    y: number;
-  }>({ x: 0, y: 0 });
+  const [newNodePosition, setNewNodePosition] = useState({ x: 0, y: 0 });
   const [isNodePlacementReady, setIsNodePlacementReady] = useState(false);
 
   const [isRunningDijkstra, setIsRunningDijkstra] = useState(false);
-  const [dijkstraResults, setDijkstraResults] = useState<any[]>([]);
   const [startingNode, setStartingNode] = useState<string | null>(null);
-  const [iteration, setIteration] = useState(0);
+
+  const [dijkstraResults, setDijkstraResults] = useState<any[]>([]);
   const [dijkstraState, setDijkstraState] = useState<{
     distances: Record<number, number>;
     previous: Record<number, number | null>;
     visited: Set<number>;
     priorityQueue: Array<{ nodeId: number; distance: number }>;
   } | null>(null);
+ 
+  const [iteration, setIteration] = useState(0);
 
   const graphContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    handleStartDijkstra();
-  }, [startingNode]);
 
   const handleAddNode = (nodeLabel: string) => {
     if (!nodeLabel) return;
@@ -49,26 +44,21 @@ const GraphInput = () => {
     setIsNodePlacementReady(false);
   };
 
-  const handleVisualizerClick = (
-    e: React.MouseEvent<HTMLDivElement, MouseEvent>
-  ) => {
+  const handleVisualizerClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const container = graphContainerRef.current;
     if (!container) return;
 
     const { offsetX, offsetY } = e.nativeEvent;
-
     setNewNodePosition({ x: offsetX, y: offsetY });
     setIsNodePlacementReady(true);
   };
 
-  const handleStartDijkstra = () => {
+  const handleStartAlgorithm = () => {
     if (!startingNode) return;
 
     const startNodeId = parseInt(startingNode, 10);
-
     const initialDistances: Record<number, number> = {};
     const initialPrevious: Record<number, number | null> = {};
-    const initialVisited = new Set<number>();
 
     nodes.forEach((node) => {
       initialDistances[node.id] = Infinity;
@@ -79,57 +69,52 @@ const GraphInput = () => {
 
     setDijkstraResults([]);
     setIteration(0);
-
-    const initialPriorityQueue = [{ nodeId: startNodeId, distance: 0 }];
     setDijkstraState({
       distances: initialDistances,
       previous: initialPrevious,
-      visited: initialVisited,
-      priorityQueue: initialPriorityQueue,
+      visited: new Set<number>(),
+      priorityQueue: [{ nodeId: startNodeId, distance: 0 }],
     });
+    setIsRunningDijkstra(true);
   };
 
-  const handleNextDijkstraIteration = () => {
-    if (!dijkstraState) {
-      setIsRunningDijkstra(false);
-      return;
-    }
-
-    const { distances, previous, visited, priorityQueue } = dijkstraState;
-
-    if (priorityQueue.length === 0) {
-      setIsRunningDijkstra(false);
-      return;
-    }
-
-    // Sort and process the next node
-    priorityQueue.sort((a, b) => a.distance - b.distance);
-    const { nodeId: currentNode } = priorityQueue.shift()!;
-
-    if (visited.has(currentNode)) return;
-
-    visited.add(currentNode);
-
-    edges
-      .filter((edge) => edge.from === currentNode && !visited.has(edge.to))
-      .forEach((edge) => {
-        const newDistance = distances[currentNode] + edge.weight;
-        if (newDistance < distances[edge.to]) {
-          distances[edge.to] = newDistance;
-          previous[edge.to] = currentNode;
-          priorityQueue.push({ nodeId: edge.to, distance: newDistance });
-        }
-      });
-
-    setDijkstraResults((prevResults) => [
-      ...prevResults,
-      { iteration: iteration + 1, distances: { ...distances } },
-    ]);
-
-    setIteration((prev) => prev + 1);
-    setDijkstraState({ distances, previous, visited, priorityQueue });
+  const handleNextIteration = () => {
+    if (dijkstraState) {
+      const { distances, previous, visited, priorityQueue } = dijkstraState;
+      
+      if (priorityQueue.length === 0) {
+        setIsRunningDijkstra(false);
+        alert("Algorithm ended");
+        return;
+      }
+      
+      priorityQueue.sort((a, b) => a.distance - b.distance);
+      const { nodeId: currentNode } = priorityQueue.shift()!;
+  
+      if (visited.has(currentNode)) return;
+      visited.add(currentNode);
+      
+      edges
+        .filter((edge) => edge.from === currentNode && !visited.has(edge.to))
+        .forEach((edge) => {
+          const newDistance = distances[currentNode] + edge.weight;
+          if (newDistance < distances[edge.to]) {
+            distances[edge.to] = newDistance;
+            previous[edge.to] = currentNode;
+            priorityQueue.push({ nodeId: edge.to, distance: newDistance });
+          }
+        });
+        
+      setDijkstraResults((prev) => [
+        ...prev,
+        { iteration: iteration + 1, distances: { ...distances } },
+      ]);
+      setIteration((prev) => prev + 1);
+      setDijkstraState({ distances, previous, visited, priorityQueue });
+    } 
   };
 
+  
   return (
     <div className="relative w-full h-full p-4 grid grid-cols-3">
       <GraphVisualizer
@@ -146,17 +131,11 @@ const GraphInput = () => {
               isNodePlacementReady={isNodePlacementReady}
               onSubmit={handleAddNode}
             />
-            <EdgeInputForm edges={edges} setEdges={setEdges} nodes={nodes} />
-            <Button onClick={() => setIsRunningDijkstra(true)}>
-              Run Dijkstra
-            </Button>
-          </>
-        ) : !startingNode ? (
-          <>
+            <EdgeInputForm edges={edges} setEdges={setEdges} nodes={nodes} graphType={"dijkstra"} />
             <label>Select Starting Node:</label>
             <select
               onChange={(e) => setStartingNode(e.target.value)}
-              className="p-2 border rounded"
+              className="p-2 border rounded text-black"
             >
               <option value="">Select a node</option>
               {nodes.map((node) => (
@@ -165,28 +144,26 @@ const GraphInput = () => {
                 </option>
               ))}
             </select>
+            <Button onClick={() => handleStartAlgorithm()}>
+              Run Dijkstra
+            </Button>
           </>
         ) : (
-          <div className="overflow-x-auto">
-            <>
-              <table className="table-auto border-collapse border border-gray-400">
-                <thead>
-                  <tr>
-                    <th className="border border-gray-300 px-4 py-2">
-                      Iteration
+          <>
+            <table className="table-auto border-collapse border border-gray-400">
+              <thead>
+                <tr>
+                  <th className="border border-gray-300 px-4 py-2">Iteration</th>
+                  {nodes.map((node) => (
+                    <th key={node.id} className="border border-gray-300 px-4 py-2">
+                      {node.label}
                     </th>
-                    {nodes.map((node) => (
-                      <th
-                        key={node.id}
-                        className="border border-gray-300 px-4 py-2"
-                      >
-                        {node.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {dijkstraResults.map((result, index) => (
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(dijkstraResults).map(
+                  (result, index) => (
                     <tr key={index}>
                       <td className="border border-gray-300 px-4 py-2">
                         {result.iteration}
@@ -204,16 +181,23 @@ const GraphInput = () => {
                         </td>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              <Button onClick={handleNextDijkstraIteration}>Next</Button>
-            </>
-          </div>
+                  )
+                )}
+              </tbody>
+            </table>
+            
+            <Button
+              onClick={() =>
+                handleNextIteration()
+              }
+            >
+              Next Iteration
+            </Button>
+          </>
         )}
       </div>
     </div>
   );
 };
 
-export default GraphInput;
+export default DijkstraInput;

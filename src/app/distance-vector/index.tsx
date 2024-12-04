@@ -1,3 +1,10 @@
+import BellmanFordInput from "@/components/BellmanFordInput";
+
+
 export default function DistanceVectorPage() {
-  return <div>This is the distance vector page</div>;
+  return (    
+    <div className="h-screen w-full">
+      <BellmanFordInput/>
+    </div>
+  );
 }

@@ -32,22 +32,38 @@ const FormSchema = z.object({
   to: z.string({
     required_error: "Please select a node for the 'to' edge.",
   }),
+});
+
+const DijkstraFormSchema=FormSchema.extend({
   edgeWeight: z
     .string()
     .regex(/^\d+(\.\d{1,2})?$/, {
       message: "Edge weight must be a valid number.",
     })
-    .min(1, { message: "Edge weight is required." }),
-});
+    .min(0, { message: "Edge weight is required." })
+})
+
+const BellmanFordSchema=FormSchema.extend({
+  edgeWeight: z
+  .string()
+  .regex(/^\d+(\.\d{1,2})?$/, {
+    message: "Edge weight must be a valid number.",
+  })
+})
 
 interface EdgeInputFormProps {
   edges: Edge[];
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   nodes: Node[];
+  graphType:string
 }
 
-export function EdgeInputForm({ edges, setEdges, nodes }: EdgeInputFormProps) {
-  const form = useForm<z.infer<typeof FormSchema>>({
+export function EdgeInputForm({ edges, setEdges, nodes,graphType }: EdgeInputFormProps) {
+
+  const currentSchema = graphType === "dijkstra" ? DijkstraFormSchema : BellmanFordSchema;
+
+
+  const form = useForm<z.infer<typeof currentSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
       from: "",
@@ -56,7 +72,8 @@ export function EdgeInputForm({ edges, setEdges, nodes }: EdgeInputFormProps) {
     },
   });
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
+  function onSubmit(data: z.infer<typeof currentSchema>) {
+    console.log(`number is ${parseInt(data.edgeWeight,10)}`)
     const newEdge: Edge = {
       id: generateEdgeId.next().value!,
       from: parseInt(data.from),
@@ -66,8 +83,9 @@ export function EdgeInputForm({ edges, setEdges, nodes }: EdgeInputFormProps) {
 
     setEdges([...edges, newEdge]);
     form.reset(); // Reset the form state
+    console.log(newEdge.weight)
   }
-
+ 
   return (
     <Form {...form}>
       <FormLabel>Add edge</FormLabel>
